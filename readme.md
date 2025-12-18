@@ -66,7 +66,7 @@ To find the pack ID and version for your desired modpack:
 ```yaml
 services:
   ftb-server:
-    image: yourusername/ftb-server:latest
+    image: pvmjay/ftb-server:latest
     container_name: ftb-server
     restart: unless-stopped
     user: "1000:1000"
@@ -162,3 +162,4 @@ This image is provided as-is. Feed The Beast modpacks are subject to their own l
 ## Support
 
 For issues or questions, please open an issue on the GitHub repository.
+
