@@ -1,4 +1,4 @@
-FROM eclipse-temurin:8-jre
+FROM eclipse-temurin:25-jre
 
 # Install necessary tools
 RUN apt-get update && \
