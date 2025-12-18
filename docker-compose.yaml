@@ -1,0 +1,20 @@
+services:
+  ftb-server:
+    image: pvmjay/ftb-server:latest
+    container_name: ftb-server
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "25565:25565"
+    volumes:
+      - ./data:/data
+    environment:
+      # Optional: Specify your FTB pack and version
+      # If not specified, defaults to FTB Academy (pack 88, version 100026)
+      - FTB_PACK_ID=88
+      - FTB_PACK_VERSION=100026
+      - JAVA_OPTS=-Xms2G -Xmx16G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1
+    stdin_open: true
+    tty: true
+    mem_limit: 18g
+    mem_reservation: 16g
