@@ -1,167 +1,166 @@
-# FTB Minecraft Server Docker Image
+# Minecraft Modpack Server
 
-A Docker image for running Feed The Beast (FTB) Minecraft modpack servers with easy configuration.
+A Docker Compose setup for running Feed The Beast and CurseForge Minecraft
+modpacks. It defaults to **All the Mods 10** and includes an optional RCON web
+console.
+
+The image is based on
+[`itzg/minecraft-server`](https://github.com/itzg/docker-minecraft-server),
+which handles modpack installation, updates, loader selection, EULA acceptance,
+permissions, health checks, and graceful shutdowns.
 
 ## Features
 
-- Automatic modpack installation from FTB API
-- Configurable pack and version via environment variables
-- Automatic EULA acceptance
-- Optimized Java arguments for performance
-- Persistent data storage
+- Automatic installation and updates for CurseForge modpacks
+- Automatic installation and updates for FTB modpacks
+- All the Mods 10 defaults, including its recommended server-side exclusions
+- Persistent server data
+- Configurable Java version and memory limits
+- Optional password-protected RCON web console
+- RCON port isolated inside the Docker network
 
-## Quick Start
+## Quick start: All the Mods 10
 
-```yaml
-services:
-  ftb-server:
-    image: pvmjay/ftb-server:latest
-    container_name: ftb-server
-    restart: unless-stopped
-    ports:
-      - "25565:25565"
-    volumes:
-      - ./data:/data
-    environment:
-      - FTB_PACK_ID=88           # FTB Academy
-      - FTB_PACK_VERSION=100026
-    stdin_open: true
-    tty: true
-```
+ATM10 is a **CurseForge** modpack (not SourceForge) and requires Java 21.
 
-## Configuration
+1. Copy the example configuration:
 
-### Environment Variables
+   ```bash
+   cp .env.example .env
+   ```
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `FTB_PACK_ID` | `88` | The FTB modpack ID (FTB Academy by default) |
-| `FTB_PACK_VERSION` | `100026` | The modpack version |
-| `JAVA_OPTS` | (optimized) | Java JVM arguments |
+2. Replace `RCON_PASSWORD` and `RWA_PASSWORD` in `.env`. Generate strong values
+   with:
 
-### Finding Pack IDs and Versions
+   ```bash
+   openssl rand -base64 32
+   ```
 
-To find the pack ID and version for your desired modpack:
+3. Start the Minecraft server:
 
-1. Visit [feed-the-beast.com](https://www.feed-the-beast.com/)
-2. Find your desired modpack
-3. Check the URL or modpack details for the pack ID
-4. Select the version you want to use
+   ```bash
+   docker compose up -d --build
+   ```
 
-### Common FTB Modpacks
+4. Follow the first installation:
 
-| Modpack | Pack ID | Example Version |
-|---------|---------|-----------------|
-| FTB Academy | 88 | 100026 |
-| FTB Revelation | 35 | 12180 |
-| FTB Continuum | 34 | 149 |
-| FTB Infinity Evolved | 23 | 99 |
+   ```bash
+   docker compose logs -f minecraft
+   ```
 
-## Usage
+Minecraft listens on port `25565`. Server files and the world are stored in
+`./data`.
 
-### Using Docker Compose (Recommended)
+By default the latest ATM10 release is selected on every restart. To pin a
+version, set either `CF_FILE_ID` or `CF_FILENAME_MATCHER` in `.env`.
 
-1. Create a `docker-compose.yml` file:
+## Web console
 
-```yaml
-services:
-  ftb-server:
-    image: pvmjay/ftb-server:latest
-    container_name: ftb-server
-    restart: unless-stopped
-    user: "1000:1000"
-    ports:
-      - "25565:25565"
-    volumes:
-      - ./data:/data
-    environment:
-      - FTB_PACK_ID=88
-      - FTB_PACK_VERSION=100026
-      - JAVA_OPTS=-Xms2G -Xmx16G -XX:+UseG1GC
-    stdin_open: true
-    tty: true
-    mem_limit: 18g
-    mem_reservation: 16g
-```
-
-2. Start the server:
-```bash
-docker-compose up -d
-```
-
-3. View logs:
-```bash
-docker-compose logs -f
-```
-
-### Using Docker Run
+Start the server together with RCON Web Admin:
 
 ```bash
-docker run -d \
-  --name ftb-server \
-  -p 25565:25565 \
-  -v ./data:/data \
-  -e FTB_PACK_ID=88 \
-  -e FTB_PACK_VERSION=100026 \
-  --restart unless-stopped \
-  pvmjay/ftb-server:latest
+docker compose --profile web up -d --build
 ```
 
-## Memory Requirements
+Open <http://127.0.0.1:4326> on the Docker host and sign in with
+`RWA_USERNAME` and `RWA_PASSWORD` from `.env`.
 
-Different modpacks have different memory requirements. Adjust `mem_limit`, `mem_reservation`, and the `-Xmx` value in `JAVA_OPTS` based on your modpack:
+Both the HTTP UI and its WebSocket port bind to localhost by default. For access
+from another computer, set `RCON_WEB_BIND` to the Docker host's LAN address and
+allow ports 4326 and 4327 through the local firewall. For internet access, put
+both endpoints behind an HTTPS reverse proxy instead of exposing them directly.
+The Minecraft RCON port `25575` must never be published; the web console reaches
+it over the private Compose network.
 
-- **Light modpacks**: 4-8GB
-- **Medium modpacks**: 8-12GB
-- **Heavy modpacks**: 12-16GB+
+The web console can run commands, administer players, and show server status. It
+does not control the Docker container itself. Use Docker Compose or Portainer for
+container start, stop, restart, logs, and updates.
 
-## Ports
+## Use another CurseForge modpack
 
-- `25565` - Minecraft server port
+Set the platform and the slug from the modpack URL in `.env`:
 
-## Volumes
+```dotenv
+MODPACK_PLATFORM=AUTO_CURSEFORGE
+CF_SLUG=all-the-mods-10
+```
 
-- `/data` - Server files, world data, configs, and mods
+For `https://www.curseforge.com/minecraft/modpacks/example-pack`, the slug is
+`example-pack`. Change `JAVA_VERSION` when the pack requires a Java version
+other than 21, then rebuild with `docker compose up -d --build`.
 
-## First Run
+Some CurseForge projects block automated downloads. If the logs list files that
+need manual download, place those files in `./downloads` and restart the server.
+A personal `CF_API_KEY` can optionally be placed in `.env`; never commit it.
 
-On the first run, the container will:
-1. Download the modpack installer
-2. Install the modpack
-3. Accept the EULA automatically
-4. Start the server
+## Use an FTB modpack
 
-This process may take several minutes depending on the modpack size.
+Change `.env` to:
 
-## Accessing Server Console
+```dotenv
+MODPACK_PLATFORM=FTBA
+FTB_MODPACK_ID=88
+FTB_MODPACK_VERSION_ID=100026
+```
+
+`FTB_MODPACK_VERSION_ID` is optional; omit it to track the latest version. Find
+the numeric pack ID in its URL on the FTB site. Older packs can require Java 8
+or 17, so change `JAVA_VERSION` and rebuild when necessary.
+
+## Changing modpacks safely
+
+Do not install a different modpack over an existing world. Stop the stack, back
+up `./data`, then either move that directory or set a different `DATA_DIR` in
+`.env` before starting the new pack.
 
 ```bash
-docker attach ftb-server
+docker compose down
+mv data data-backup
+docker compose up -d --build
 ```
 
-To detach without stopping the server, press `Ctrl+P` then `Ctrl+Q`.
+## Common commands
 
-## Troubleshooting
+```bash
+# Status
+docker compose ps
 
-### Server won't start
-- Check logs: `docker logs ftb-server`
-- Ensure you have enough memory allocated
-- Verify pack ID and version are correct
+# Logs
+docker compose logs -f minecraft
 
-### Permission issues
-- Ensure the mounted volume has correct permissions
-- Adjust the `user` parameter in docker-compose to match your host user
+# Stop cleanly
+docker compose down
 
-### Out of memory errors
-- Increase `mem_limit` and `-Xmx` in `JAVA_OPTS`
+# Pull the web UI and rebuild the server image
+docker compose --profile web pull
+docker compose --profile web up -d --build
+```
+
+## Configuration reference
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `MODPACK_PLATFORM` | `AUTO_CURSEFORGE` | `AUTO_CURSEFORGE` or `FTBA` |
+| `CF_SLUG` | `all-the-mods-10` | CurseForge modpack slug |
+| `CF_FILE_ID` | empty | Pin a CurseForge file ID |
+| `CF_FILENAME_MATCHER` | empty | Pin by filename substring or regex |
+| `FTB_MODPACK_ID` | empty | Numeric FTB pack ID |
+| `FTB_MODPACK_VERSION_ID` | empty | Optional numeric FTB version ID |
+| `JAVA_VERSION` | `21` | Java major version used to build the image |
+| `INIT_MEMORY` | `4G` | Initial Java heap |
+| `MAX_MEMORY` | `12G` | Maximum Java heap |
+| `MINECRAFT_PORT` | `25565` | Published game port |
+| `DATA_DIR` | `./data` | Persistent server directory |
+| `RCON_WEB_BIND` | `127.0.0.1` | Host address for the optional web UI |
+
+See the upstream documentation for
+[Auto CurseForge](https://docker-minecraft-server.readthedocs.io/en/latest/types-and-platforms/mod-platforms/auto-curseforge/)
+and [FTB](https://docker-minecraft-server.readthedocs.io/en/latest/types-and-platforms/mod-platforms/ftb/)
+for advanced settings.
 
 ## License
 
-This image is provided as-is. Feed The Beast modpacks are subject to their own licenses.
-
-## Support
-
-For issues or questions, please open an issue on the GitHub repository.
-
+This repository is provided as-is. Minecraft, FTB, CurseForge, and individual
+modpacks are subject to their respective licenses and terms.
 
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/jayvandamme)

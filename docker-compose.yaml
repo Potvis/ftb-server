@@ -1,20 +1,73 @@
 services:
-  ftb-server:
-    image: pvmjay/ftb-server:latest
-    container_name: ftb-server
+  minecraft:
+    build:
+      context: .
+      args:
+        JAVA_VERSION: ${JAVA_VERSION:-21}
+    image: ${MINECRAFT_IMAGE:-pvmjay/ftb-server:latest}
+    container_name: ${CONTAINER_NAME:-minecraft-server}
     restart: unless-stopped
-    user: "1000:1000"
+    stop_grace_period: 2m
     ports:
-      - "25565:25565"
+      - "${MINECRAFT_PORT:-25565}:25565"
     volumes:
-      - ./data:/data
+      - ${DATA_DIR:-./data}:/data
+      - ${DOWNLOADS_DIR:-./downloads}:/downloads:ro
     environment:
-      # Optional: Specify your FTB pack and version
-      # If not specified, defaults to FTB Academy (pack 88, version 100026)
-      - FTB_PACK_ID=88
-      - FTB_PACK_VERSION=100026
-      - JAVA_OPTS=-Xms2G -Xmx16G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1
+      EULA: "${EULA:-TRUE}"
+
+      # Select AUTO_CURSEFORGE or FTBA. The unused platform variables are ignored.
+      MODPACK_PLATFORM: ${MODPACK_PLATFORM:-AUTO_CURSEFORGE}
+
+      # CurseForge settings. Defaults install the latest All the Mods 10 release.
+      CF_SLUG: ${CF_SLUG:-all-the-mods-10}
+      CF_FILE_ID: ${CF_FILE_ID:-}
+      CF_FILENAME_MATCHER: ${CF_FILENAME_MATCHER:-}
+      CF_API_KEY: ${CF_API_KEY:-}
+      CF_IGNORE_MISSING_FILES: |
+        config/ftbquests/quests/reward_tables/*.snbt
+      CF_OVERRIDES_EXCLUSIONS: |
+        shaderpacks/**
+
+      # Feed The Beast settings. Set MODPACK_PLATFORM=FTBA to use these.
+      FTB_MODPACK_ID: ${FTB_MODPACK_ID:-}
+      FTB_MODPACK_VERSION_ID: ${FTB_MODPACK_VERSION_ID:-}
+
+      # Runtime settings.
+      INIT_MEMORY: ${INIT_MEMORY:-4G}
+      MAX_MEMORY: ${MAX_MEMORY:-12G}
+      USE_MEOWICE_FLAGS: "${USE_MEOWICE_FLAGS:-true}"
+      UID: ${MC_UID:-1000}
+      GID: ${MC_GID:-1000}
+      TZ: ${TZ:-Europe/Brussels}
+
+      # RCON is only reachable inside this Compose network.
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: ${RCON_PASSWORD:?Set RCON_PASSWORD in .env}
     stdin_open: true
     tty: true
-    mem_limit: 18g
-    mem_reservation: 16g
+    mem_limit: ${CONTAINER_MEMORY_LIMIT:-14g}
+    mem_reservation: ${CONTAINER_MEMORY_RESERVATION:-12g}
+
+  rcon-web:
+    image: itzg/rcon:latest
+    container_name: ${RCON_CONTAINER_NAME:-minecraft-rcon-web}
+    profiles: ["web"]
+    restart: unless-stopped
+    depends_on:
+      - minecraft
+    environment:
+      RWA_USERNAME: ${RWA_USERNAME:-admin}
+      RWA_PASSWORD: ${RWA_PASSWORD:?Set RWA_PASSWORD in .env}
+      RWA_ADMIN: "TRUE"
+      RWA_RCON_HOST: minecraft
+      RWA_RCON_PORT: 25575
+      RWA_RCON_PASSWORD: ${RCON_PASSWORD:?Set RCON_PASSWORD in .env}
+    ports:
+      - "${RCON_WEB_BIND:-127.0.0.1}:${RCON_WEB_PORT:-4326}:4326"
+      - "${RCON_WEB_BIND:-127.0.0.1}:${RCON_WEBSOCKET_PORT:-4327}:4327"
+    volumes:
+      - rcon-data:/opt/rcon-web-admin/db
+
+volumes:
+  rcon-data:
